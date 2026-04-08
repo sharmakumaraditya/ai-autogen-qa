@@ -32,7 +32,7 @@ ENV_URL = os.environ.get("ENV_URL", "http://localhost:8000")
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o")
-HF_TOKEN = os.environ.get("HF_TOKEN", os.environ.get("OPENAI_API_KEY", ""))
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("OPENAI_API_KEY")
 
 client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
 
