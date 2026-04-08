@@ -9,6 +9,7 @@ description = "AI AutoGen QA - Automated Test Case Generator for OpenEnv Hackath
 requires-python = ">=3.11"
 dependencies = [
     "openai>=1.15.0",
+    "openenv-core>=0.2.0",
     "langchain>=0.1.16",
     "langgraph>=0.0.26",
     "langchain-core>=0.1.42",
@@ -23,3 +24,6 @@ dependencies = [
     "requests>=2.31.0",
     "pydantic>=2.5.0",
 ]
+
+[project.scripts]
+serve = "server.app:app"
