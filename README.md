@@ -1,3 +1,12 @@
+---
+title: metaHackathon
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # AI AutoGen QA — Automated Test Case Generator
 
 > **OpenEnv Hackathon Submission** — An AI-powered QA environment that transforms software documentation into comprehensive, structured test suites using a reflection-augmented LangGraph pipeline.
