@@ -1,0 +1,46 @@
+name: ai-autogen-qa
+version: "1.0.0"
+description: >
+  AI-powered QA Test Case Generator. Submit software documentation (FRD, Technical Design,
+  API Docs) and automatically generate comprehensive test scenarios and detailed test cases
+  using a 4-node LangGraph pipeline with reflection-based quality assurance. The environment
+  exposes a standard OpenEnv HTTP API (reset/step/state) backed by an LLM-driven pipeline
+  that produces structured, graded QA artifacts.
+
+env_vars:
+  - API_BASE_URL
+  - MODEL_NAME
+  - HF_TOKEN
+
+models:
+  action: models.QAAction
+  observation: models.QAObservation
+  state: models.QAState
+
+tasks:
+  - id: easy
+    name: Generate scenarios from a single API doc
+    description: >
+      Provide one API documentation text and generate test scenarios.
+      The agent must produce at least 5 meaningful scenarios covering
+      endpoint functionality, authentication, and error handling.
+      Score scales linearly: count/5, capped at 1.0.
+    grader: graders/easy.py
+
+  - id: medium
+    name: Generate scenarios from FRD + API doc with reflection
+    description: >
+      Provide a Feature Requirement Document alongside API documentation.
+      The agent must produce 10+ scenarios with a validated reflection pass
+      that ensures coverage across functional, security, and edge-case dimensions.
+      Score: 60% scenario count + 40% reflection completion.
+    grader: graders/medium.py
+
+  - id: hard
+    name: Full pipeline — scenarios, test cases, and quality assessment
+    description: >
+      Provide FRD + API documentation and run the complete 4-node pipeline:
+      scenario generation, scenario reflection, detailed test case generation,
+      and quality assessment. Evaluates scenario count (25%), reflection pass (15%),
+      test case count (25%), stage-2 completion (10%), and quality score (25%).
+    grader: graders/hard.py

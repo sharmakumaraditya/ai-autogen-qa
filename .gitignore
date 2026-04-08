@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+*.mp4
+.DS_Store
+temp_video_parts/
+generated_tests/
+ai_autogen_env/
