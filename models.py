@@ -38,10 +38,10 @@ class QAAction(BaseModel):
 class QAObservation(BaseModel):
     """Observation returned after reset() or step()."""
     done: bool = False
-    reward: Optional[float] = Field(None, ge=0.0, le=1.0)
+    reward: Optional[float] = Field(None, gt=0.0, lt=1.0)
     scenarios_generated: int = Field(0, ge=0)
     test_cases_generated: int = Field(0, ge=0)
-    quality_score: float = Field(0.0, ge=0.0, le=1.0)
+    quality_score: float = Field(0.01, ge=0.0, le=1.0)
     stage: str = "idle"
     message: str = ""
     scenarios: List[Dict[str, Any]] = Field(default_factory=list)
@@ -57,6 +57,6 @@ class QAState(BaseModel):
     stage: str = "idle"
     scenarios_generated: int = Field(0, ge=0)
     test_cases_generated: int = Field(0, ge=0)
-    quality_score: float = Field(0.0, ge=0.0, le=1.0)
+    quality_score: float = Field(0.01, ge=0.0, le=1.0)
     is_finished_stage1: bool = False
     is_finished_stage2: bool = False

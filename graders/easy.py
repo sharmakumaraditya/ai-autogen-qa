@@ -2,13 +2,25 @@
 
 
 def grade(result: dict) -> float:
-    scenarios = result.get("scenario_list", [])
-    count = len(scenarios) if isinstance(scenarios, list) else 0
-    if count >= 5:
-        raw = 1.0
-    elif count <= 0:
-        raw = 0.0
+    # Handle multiple data formats the platform may pass:
+    # - scenario_list: list (internal pipeline format)
+    # - scenarios: list (observation format)
+    # - scenarios_generated: int (state/observation count field)
+    scenario_list = result.get("scenario_list") or result.get("scenarios") or []
+    if isinstance(scenario_list, list):
+        count = len(scenario_list)
     else:
-        raw = round(count / 5, 2)
-    # Must be strictly between 0 and 1 (exclusive)
-    return max(0.01, min(raw, 0.99))
+        count = 0
+
+    # Fall back to integer count field if list is empty
+    if count == 0:
+        count = int(result.get("scenarios_generated", 0))
+
+    if count >= 5:
+        raw = 0.99
+    elif count == 0:
+        raw = 0.01
+    else:
+        raw = round(max(0.01, min(count / 5, 0.99)), 2)
+
+    return raw

@@ -90,7 +90,7 @@ async def reset(request: Dict[str, Any] = Body(default={})) -> Dict[str, Any]:
     )
     obs = QAObservation(
         done=False,
-        reward=0.0,
+        reward=0.01,
         stage="ready",
         message="Environment reset. Send a step() with task_id and document texts.",
     )
@@ -111,7 +111,7 @@ async def step(request: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
     except Exception as e:
         obs = QAObservation(
             done=True,
-            reward=0.0,
+            reward=0.01,
             stage="error",
             message=f"Invalid action: {e}",
         )
@@ -216,7 +216,7 @@ async def step(request: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
         _state.stage = "error"
         obs = QAObservation(
             done=True,
-            reward=0.0,
+            reward=0.01,
             stage="error",
             message=f"Pipeline error: {str(e)}",
         )
