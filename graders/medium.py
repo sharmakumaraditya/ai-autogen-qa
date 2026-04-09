@@ -1,4 +1,4 @@
-"""Medium grader: FRD + API doc -> 10+ scenarios with reflection pass. Score 0.0-1.0."""
+"""Medium grader: FRD + API doc -> 10+ scenarios with reflection pass. Score strictly in (0, 1)."""
 
 
 def grade(result: dict) -> float:
@@ -16,4 +16,6 @@ def grade(result: dict) -> float:
     if reflected:
         score += 0.4
 
-    return min(round(score, 2), 1.0)
+    raw = min(round(score, 2), 1.0)
+    # Must be strictly between 0 and 1 (exclusive)
+    return max(0.01, min(raw, 0.99))

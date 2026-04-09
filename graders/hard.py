@@ -1,4 +1,4 @@
-"""Hard grader: full pipeline with test cases and quality score. Score 0.0-1.0."""
+"""Hard grader: full pipeline with test cases and quality score. Score strictly in (0, 1)."""
 
 
 def grade(result: dict) -> float:
@@ -38,4 +38,6 @@ def grade(result: dict) -> float:
     # Quality score (25%)
     score += round(0.25 * min(float(quality), 1.0), 2)
 
-    return min(round(score, 2), 1.0)
+    raw = min(round(score, 2), 1.0)
+    # Must be strictly between 0 and 1 (exclusive)
+    return max(0.01, min(raw, 0.99))

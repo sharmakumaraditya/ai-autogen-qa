@@ -44,8 +44,11 @@ def _score(
     finished_s2: bool,
 ) -> float:
     """Compute reward in [0.0, 1.0] matching graders."""
+    def _clamp(v: float) -> float:
+        return max(0.01, min(round(v, 2), 0.99))
+
     if task_id == "easy":
-        return min(round(len(scenarios) / 5, 2), 1.0)
+        return _clamp(len(scenarios) / 5)
 
     if task_id == "medium":
         s = 0.0
@@ -56,7 +59,7 @@ def _score(
             s += round(0.6 * c / 10, 2)
         if finished_s1:
             s += 0.4
-        return min(round(s, 2), 1.0)
+        return _clamp(s)
 
     # hard
     s = 0.0
@@ -73,7 +76,7 @@ def _score(
     if finished_s2:
         s += 0.10
     s += round(0.25 * min(quality, 1.0), 2)
-    return min(round(s, 2), 1.0)
+    return _clamp(s)
 
 
 @app.post("/reset")
