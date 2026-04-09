@@ -5,7 +5,7 @@ inference.py — Hackathon baseline inference script for AI AutoGen QA.
 Talks to the OpenEnv server (POST /reset, POST /step, GET /state)
 and uses the OpenAI Client for LLM calls.
 
-Emits structured [START], [STEP], [END] logs as required.
+Emits structured [START], [STEP], [END] logs as required by the sample format.
 
 Required env vars:
     API_BASE_URL   – LLM API endpoint  (default: https://api.openai.com/v1)
@@ -13,11 +13,11 @@ Required env vars:
     HF_TOKEN       – API key
 """
 
-import json
 import os
 import sys
 import time
 from pathlib import Path
+from typing import List, Optional
 
 try:
     from dotenv import load_dotenv
@@ -39,10 +39,30 @@ client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
 MAX_RETRIES = 3
 RETRY_DELAY = 5
 REQUEST_TIMEOUT = 300
+BENCHMARK = "ai-autogen-qa"
 
 
-def log(tag: str, payload: dict):
-    print(f"[{tag}] {json.dumps(payload)}", flush=True)
+def _clamp_score(v: float) -> float:
+    """Clamp score to strictly between 0 and 1 (exclusive)."""
+    return max(0.01, min(float(v), 0.99))
+
+
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str] = None) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 
 def _request_with_retry(method: str, url: str, **kwargs):
@@ -97,101 +117,80 @@ def generate_doc_text(description: str) -> str:
                 raise
 
 
-def run_task(task_id: str):
+def run_task(task_id: str) -> float:
     """Run one task through the OpenEnv endpoints."""
+    rewards: List[float] = []
+    steps_taken = 0
+    score = 0.01  # default to valid score
 
-    log("START", {
-        "task_id": task_id,
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    })
+    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
-    # 1. Reset
-    reset_result = call_reset(episode_id=f"inference_{task_id}")
-    log("STEP", {
-        "task_id": task_id,
-        "step": 0,
-        "node": "reset",
-        "observation": reset_result.get("observation", {}),
-    })
+    try:
+        # Step 1: Reset
+        reset_result = call_reset(episode_id=f"inference_{task_id}")
+        steps_taken = 1
+        log_step(step=1, action="reset", reward=0.01, done=False)
+        rewards.append(0.01)
 
-    # 2. Generate documents via OpenAI Client
-    log("STEP", {
-        "task_id": task_id,
-        "step": 1,
-        "node": "generate_docs",
-        "message": "Generating sample documents via OpenAI Client",
-    })
-
-    api_doc_text = generate_doc_text(
-        "Write a detailed API documentation for a User Management REST API with "
-        "endpoints: POST /users, GET /users, GET /users/{id}, PUT /users/{id}, "
-        "DELETE /users/{id}, POST /auth/login. Include request/response JSON schemas, "
-        "HTTP status codes, authentication requirements (JWT Bearer tokens), "
-        "rate limiting rules, and pagination parameters."
-    )
-
-    design_doc_texts = []
-    if task_id in ("medium", "hard"):
-        frd_text = generate_doc_text(
-            "Write a Feature Requirement Document (FRD) for a User Management system. "
-            "Include detailed requirements for: user CRUD operations, role-based access "
-            "control (admin/editor/viewer), JWT authentication with refresh tokens, "
-            "email validation, password policy (min 8 chars, uppercase, special char), "
-            "cursor-based pagination, soft-delete with 30-day retention, and audit logging "
-            "with actor/action/timestamp/resource fields."
+        # Step 2: Generate documents via OpenAI Client
+        api_doc_text = generate_doc_text(
+            "Write a detailed API documentation for a User Management REST API with "
+            "endpoints: POST /users, GET /users, GET /users/{id}, PUT /users/{id}, "
+            "DELETE /users/{id}, POST /auth/login. Include request/response JSON schemas, "
+            "HTTP status codes, authentication requirements (JWT Bearer tokens), "
+            "rate limiting rules, and pagination parameters."
         )
-        design_doc_texts.append(frd_text)
 
-    log("STEP", {
-        "task_id": task_id,
-        "step": 2,
-        "node": "docs_ready",
-        "design_docs": len(design_doc_texts),
-        "api_doc_length": len(api_doc_text),
-    })
+        design_doc_texts = []
+        if task_id in ("medium", "hard"):
+            frd_text = generate_doc_text(
+                "Write a Feature Requirement Document (FRD) for a User Management system. "
+                "Include detailed requirements for: user CRUD operations, role-based access "
+                "control (admin/editor/viewer), JWT authentication with refresh tokens, "
+                "email validation, password policy (min 8 chars, uppercase, special char), "
+                "cursor-based pagination, soft-delete with 30-day retention, and audit logging "
+                "with actor/action/timestamp/resource fields."
+            )
+            design_doc_texts.append(frd_text)
 
-    # 3. Step: run the QA pipeline
-    action = {
-        "task_id": task_id,
-        "design_doc_texts": design_doc_texts,
-        "api_doc_text": api_doc_text,
-    }
+        steps_taken = 2
+        log_step(step=2, action="generate_docs", reward=0.01, done=False)
+        rewards.append(0.01)
 
-    step_result = call_step(action)
-    obs = step_result.get("observation", {})
-    reward = step_result.get("reward", 0.0)
-    done = step_result.get("done", True)
+        # Step 3: Run the QA pipeline
+        action = {
+            "task_id": task_id,
+            "design_doc_texts": design_doc_texts,
+            "api_doc_text": api_doc_text,
+        }
 
-    log("STEP", {
-        "task_id": task_id,
-        "step": 3,
-        "node": "pipeline_complete",
-        "scenarios": obs.get("scenarios_generated", 0),
-        "test_cases": obs.get("test_cases_generated", 0),
-        "quality_score": obs.get("quality_score", 0.0),
-        "reward": reward,
-        "done": done,
-    })
+        step_result = call_step(action)
+        obs = step_result.get("observation", {})
+        reward = _clamp_score(step_result.get("reward", 0.01))
+        done = step_result.get("done", True)
 
-    # 4. Fetch final state
-    state = call_state()
-    log("STEP", {
-        "task_id": task_id,
-        "step": 4,
-        "node": "get_state",
-        "state": state,
-    })
+        steps_taken = 3
+        log_step(step=3, action="run_pipeline", reward=reward, done=done)
+        rewards.append(reward)
 
-    log("END", {
-        "task_id": task_id,
-        "reward": reward,
-        "scenarios_generated": obs.get("scenarios_generated", 0),
-        "test_cases_generated": obs.get("test_cases_generated", 0),
-        "quality_score": obs.get("quality_score", 0.0),
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    })
+        # Step 4: Fetch final state
+        state = call_state()
+        steps_taken = 4
+        log_step(step=4, action="get_state", reward=reward, done=True)
+        rewards.append(reward)
 
-    return reward
+        score = reward
+
+    except Exception as e:
+        print(f"[DEBUG] Error in task {task_id}: {e}", file=sys.stderr, flush=True)
+        score = 0.01
+        if not rewards:
+            rewards.append(0.01)
+
+    success = score > 0.5
+    log_end(success=success, steps=steps_taken, score=_clamp_score(score), rewards=[_clamp_score(r) for r in rewards])
+
+    return score
 
 
 def main():
@@ -206,13 +205,8 @@ def main():
             score = run_task(task_id)
         except Exception as e:
             print(f"  ERROR running task {task_id}: {e}", file=sys.stderr)
-            score = 0.0
-            log("END", {
-                "task_id": task_id,
-                "reward": 0.0,
-                "error": str(e),
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            })
+            score = 0.01
+            log_end(success=False, steps=0, score=0.01, rewards=[0.01])
         results[task_id] = score
 
     print(f"\n{'=' * 60}")
